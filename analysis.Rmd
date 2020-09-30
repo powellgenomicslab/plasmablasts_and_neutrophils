@@ -111,8 +111,8 @@ As we're only interested in the scaled pearson residuals, let's set
 Set up future settings for parallelization
 
 ```{r future_settings}
-options(future.globals.maxSize = 1.5 * 1024^3)
-future::plan("multisession", workers = 2)
+options(future.globals.maxSize = 2 * 1024^3)
+future::plan("multisession", workers = 10)
 ```
 
 
