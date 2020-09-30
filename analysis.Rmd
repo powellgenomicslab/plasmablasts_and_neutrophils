@@ -1,0 +1,202 @@
+---
+title: "Analysis of PBMCs from individuals with severe COVID-19"
+author: "Jose Alquicira Hernandez"
+date: "30/09/2020"
+output: 
+  html_document:
+    self_contained: yes
+    toc: true
+    toc_float: true
+    toc_depth: 2
+    code_folding: show
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(fig.width = 8, fig.height = 5)
+```
+
+# Import libraries
+
+Install packages if necessary
+
+```{r}
+if (!requireNamespace("tidyverse", quietly = TRUE))
+    install.packages("tidyverse")
+if (!requireNamespace("here", quietly = TRUE))
+    install.packages("here")
+if (!requireNamespace("Seurat", quietly = TRUE))
+    install.packages("Seurat")
+```
+
+Load libraries
+
+```{r load_libraries}
+library("tidyverse")
+library("here")
+library("Seurat")
+library("patchwork")
+```
+
+Set up colors to match populations with publication
+
+```{r colors}
+pal <- c("#1F77B4", "#AEC7E8", "#FF7F0E", "#FFBB78", "#2CA02C",
+         "#98DF8A", "#D62728", "#FF9896", "#9467BD", "#C5B0D5",
+         "#8C564B", "#C49C94", "#E377C2", "#F7B6D2", "#7F7F7F",
+         "#C7C7C7", "#BCBD22", "#DBDB8D", "#17BECF", "#9EDAE5")
+```
+
+# Import data
+
+Read data
+
+```{r read_data}
+filename <- here("data", "blish_covid.seu.rds")
+data <- readRDS(filename)
+```
+
+
+```{r sample}
+set.seed(66)
+i <- sample(seq_len(ncol(data)), size = 5000)
+data <- data[,i]
+```
+
+
+# Label cells according to publication figures
+
+```{r label_cells}
+x <- data@meta.data$cell.type 
+data$cell_type <- case_when(
+  x == "Activated Granulocyte" ~ "Developing neutrophil",
+  x == "CD4 T"                 ~ "IFN-stim CD4 T",
+  x == "CD8eff T"              ~ "Proliferative lymphocytes",
+  x == "Class-switched B"      ~ "IgM PB",
+  TRUE ~ x
+)
+Idents(data) <- "cell_type"
+```
+
+# Reproduce original figure from paper
+
+```{r original_fig}
+DimPlot(data, label = TRUE, label.size = 3, repel = TRUE, cols = pal)
+```
+
+In the paper, the following variables in the metadata slot are regressed out
+within `SCTransform`.
+
+```{r covariates}
+data@commands$SCTransform.RNA$vars.to.regress
+```
+
+And the command run was
+
+```{r command}
+data@commands$SCTransform.RNA
+```
+
+For reproducibility purposes, let's use the original command as reference
+`return.only.var.genes` is set to `TRUE` by default so 
+`return.only.var.genes = TRUE` will be ommitted.
+
+For the UMAP and to construct the Shared Nearest Neighbor (SNN) Graph, *50* 
+principal components were used:
+
+
+```{r dims}
+length(data@commands$RunUMAP.SCT.pca$dims)
+length(data@commands$FindNeighbors.SCT.pca$dims)
+```
+
+As we're only interested in the scaled pearson residuals, let's set
+`do.correct.umi = FALSE`.
+
+
+# Regress out mitochondrial and ribosomal gene expression only
+
+Set up future settings for parallelization
+
+```{r future_settings}
+options(future.globals.maxSize = 1.5 * 1024^3)
+future::plan("multisession", workers = 2)
+```
+
+
+```{r sct_1, message=FALSE, warning=FALSE, results='hide'}
+data <- SCTransform(data, vars.to.regress = c("percent.mt", 
+                                              "percent.rps", 
+                                              "percent.rpl", 
+                                              "percent.rrna"), 
+                    do.correct.umi = FALSE)
+
+data <- RunPCA(data)
+data <- RunUMAP(data, dims = 1:50)
+```
+
+```{r plot_1}
+(p <- DimPlot(data, label = TRUE, label.size = 3, repel = TRUE, cols = pal))
+```
+
+```{r save_plot_1}
+ggsave(here("mito_and_ribo.png"), p, width = 8, height = 5, dpi = "print")
+```
+
+
+# Regress out mitochondrial gene expression only
+
+
+```{r sct_2, message=FALSE, warning=FALSE, results='hide'}
+data <- SCTransform(data, vars.to.regress = "percent.mt", 
+                    do.correct.umi = FALSE)
+
+
+data <- RunPCA(data)
+data <- RunUMAP(data, dims = 1:50)
+```
+
+```{r plot_2}
+(p2 <- DimPlot(data, label = TRUE, label.size = 3, repel = TRUE, cols = pal))
+```
+
+```{r save_plot_2}
+ggsave(here("mito.png"), p, width = 8, height = 5, dpi = "print")
+```
+
+
+# Subset neutrophils, dev. neutruphils, B cells, and plasmablasts
+
+
+```{r sct_3, message=FALSE, warning=FALSE, results='hide'}
+i <- data$cell_type %in% c("Developing neutrophil", "IgM PB", "IgA PB", "IgG PB", "Neutrophil", "B")
+data <- data[,i]
+
+Idents(data) <- "cell_type"
+
+data <- SCTransform(data,  vars.to.regress = c("percent.mt", "percent.rps", "percent.rpl",
+                                               "percent.rrna", "nCount_RNA", "nFeature_RNA"),
+                    do.correct.umi = FALSE)
+
+
+data <- RunPCA(data)
+data <- RunUMAP(data, dims = 1:50)
+```
+
+
+```{r plot_3}
+cols2 <- c("#AEC7E8", "#FF7F0E", "#FFBB78", "#9467BD", "#E377C2", "#DBDB8D")
+(p <- DimPlot(data, label = TRUE, label.size = 3, repel = TRUE, cols = cols2))
+```
+
+```{r save_plot_3}
+ggsave(here("neutrophils_b_plasma.png"), p, width = 8, height = 5, dpi = "print")
+```
+
+
+# Session information
+
+```{r}
+options(width = 120)
+devtools::session_info()
+```
+
