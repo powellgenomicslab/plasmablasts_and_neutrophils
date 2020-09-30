@@ -19,7 +19,7 @@ knitr::opts_chunk$set(fig.width = 8, fig.height = 5)
 
 Install packages if necessary
 
-```{r}
+```{r installation}
 if (!requireNamespace("tidyverse", quietly = TRUE))
     install.packages("tidyverse")
 if (!requireNamespace("here", quietly = TRUE))
@@ -53,13 +53,6 @@ Read data
 ```{r read_data}
 filename <- here("data", "blish_covid.seu.rds")
 data <- readRDS(filename)
-```
-
-
-```{r sample}
-set.seed(66)
-i <- sample(seq_len(ncol(data)), size = 5000)
-data <- data[,i]
 ```
 
 
@@ -195,7 +188,7 @@ ggsave(here("neutrophils_b_plasma.png"), p, width = 8, height = 5, dpi = "print"
 
 # Session information
 
-```{r}
+```{r session_info}
 options(width = 120)
 devtools::session_info()
 ```
