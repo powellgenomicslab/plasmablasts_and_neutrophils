@@ -157,7 +157,7 @@ ggsave(here("mito.png"), p, width = 8, height = 5, dpi = "print")
 ```
 
 
-# Subset neutrophils, dev. neutruphils, B cells, and plasmablasts
+# Subset neutrophils, dev. neutrophils, B cells, and plasmablasts
 
 
 ```{r sct_3, message=FALSE, warning=FALSE, results='hide'}
